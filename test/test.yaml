@@ -1,0 +1,12 @@
+types:
+  - name: "source"
+    paths:
+      # // All files from directory A
+      - "a/*"
+      # // All files from directory A (including subdirectories)
+      - "a/**/*"
+      # // It supports negatives
+      - "!a/fileToIgnore"
+  - name: "test"
+    paths:
+      - "b/*"
