@@ -40,7 +40,8 @@ func (i *arrayFlags) Set(value string) error {
 func main() {
 	flag.Usage = usage
 	configFile := flag.String("config", "", "Config file (required)")
-	isSense := flag.Bool("i", false, "Is Insensitive (Unix Only)")
+	ignoreCase := flag.Bool("i", false, "Ignore case (Unix Only)")
+	verbose := flag.Bool("v", false, "Verbose")
 
 	var types arrayFlags
 	flag.Var(&types, "type", "Type to filter (add more than one by repeating the option)")
@@ -49,28 +50,29 @@ func main() {
 
 	if len(args) < 1 {
 		usage()
-		fmt.Printf("Path is missing.")
-		os.Exit(2)
+		fmt.Fprintln(os.Stderr, "Path is missing.")
+		os.Exit(1)
 	}
 
 	if *configFile == "" {
 		usage()
-		fmt.Printf("Config file is missing.")
-		os.Exit(2)
+		fmt.Fprintln(os.Stderr, "Config file is missing.")
+		os.Exit(1)
 	}
 
 	data, err := ioutil.ReadFile(*configFile)
 
 	if err != nil {
-		fmt.Printf("error: %v", err)
-		os.Exit(2)
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
 
 	config := Config{}
 
 	err = yaml.Unmarshal(data, &config)
 	if err != nil {
-		fmt.Printf("error: %v", err)
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
 
 	patterns := make([]string, 0)
@@ -86,13 +88,18 @@ func main() {
 			if runtime.GOOS == "windows" {
 				patterns = append(patterns, strings.ToLower(pattern))
 			} else {
-				if *isSense == true {
+				if *ignoreCase == true {
 					patterns = append(patterns, strings.ToLower(pattern))
 				} else {
 					patterns = append(patterns, pattern)
 				}
 			}
 		}
+	}
+
+	if *verbose {
+		fmt.Printf("Patterns:\n")
+		fmt.Printf("%v\n", patterns)
 	}
 
 	set, _ := glob.CompileGlobSet(patterns, glob.DefaultOptions)
@@ -105,20 +112,24 @@ func main() {
 			continue
 		}
 
-		var withFixedSeparator string
+		var target string
 
 		if runtime.GOOS == "windows" {
-			withFixedSeparator = strings.ToLower(strings.Replace(walker.Path(), "\\", "/", -1))
+			target = strings.ToLower(strings.Replace(walker.Path(), "\\", "/", -1))
 		} else {
-			if *isSense == true {
-				withFixedSeparator = strings.ToLower(walker.Path())
+			if *ignoreCase == true {
+				target = strings.ToLower(walker.Path())
 			} else {
-				withFixedSeparator = walker.Path()
+				target = walker.Path()
 			}
 		}
 
-		if walker.Stat().Mode().IsRegular() && set.MatchString(withFixedSeparator) {
+		match := walker.Stat().Mode().IsRegular() && set.MatchString(target)
+
+		if match && !*verbose {
 			fmt.Printf("%v\n", walker.Path())
+		} else if *verbose {
+			fmt.Printf("Match of %v is %v\n", target, match)
 		}
 	}
 }
