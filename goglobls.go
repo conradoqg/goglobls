@@ -40,6 +40,8 @@ func (i *arrayFlags) Set(value string) error {
 func main() {
 	flag.Usage = usage
 	configFile := flag.String("config", "", "Config file (required)")
+	isSense := flag.Bool("i", false, "Is Insensitive (Unix Only)")
+
 	var types arrayFlags
 	flag.Var(&types, "type", "Type to filter (add more than one by repeating the option)")
 	flag.Parse()
@@ -84,7 +86,11 @@ func main() {
 			if runtime.GOOS == "windows" {
 				patterns = append(patterns, strings.ToLower(pattern))
 			} else {
-				patterns = append(patterns, pattern)
+				if *isSense == true {
+					patterns = append(patterns, strings.ToLower(pattern))
+				} else {
+					patterns = append(patterns, pattern)
+				}
 			}
 		}
 	}
@@ -92,6 +98,7 @@ func main() {
 	set, _ := glob.CompileGlobSet(patterns, glob.DefaultOptions)
 
 	walker := fs.Walk(args[0])
+
 	for walker.Step() {
 		if err := walker.Err(); err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -103,7 +110,11 @@ func main() {
 		if runtime.GOOS == "windows" {
 			withFixedSeparator = strings.ToLower(strings.Replace(walker.Path(), "\\", "/", -1))
 		} else {
-			withFixedSeparator = walker.Path()
+			if *isSense == true {
+				withFixedSeparator = strings.ToLower(walker.Path())
+			} else {
+				withFixedSeparator = walker.Path()
+			}
 		}
 
 		if walker.Stat().Mode().IsRegular() && set.MatchString(withFixedSeparator) {
